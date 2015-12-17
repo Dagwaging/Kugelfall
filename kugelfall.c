@@ -133,22 +133,23 @@ static void handler(long t) {
 
 	if(possible(LARGE, height, (int) tps)) {
 		int count = measure_position();
-		
-		rt_printk("Current position is %d ticks\n", count);
-		
-		int drop_count = mod(LARGE_COUNT - tps * fall_time(height), 2048);
 
-		rt_printk("Drop position is %d ticks\n", drop_count);
-		
-		int wait_ticks = mod(drop_count - count, 2048);
+		int drop_count = mod(LARGE_COUNT - tps * fall_time(height), TICKS);
 
-		rt_printk("Waiting %d ticks\n", wait_ticks);
+		rt_printk("Current position is %d ticks, drop position is %d ticks\n", count, drop_count);
 		
+		int wait_ticks = mod(drop_count - count, TICKS);
+
 		long long wait_time = (long long) ((float) wait_ticks / tps * NANOSECONDS_PER_SECOND);
 
-		rt_printk("Waiting %lld nanoseconds\n", wait_time);
+		rt_printk("Waiting %d ticks (%lld nanoseconds)\n", wait_ticks, wait_time);
 
 		rt_sleep(nano2count(wait_time));
+
+		count = measure_position();
+		
+		rt_printk("Dropping at %d ticks (off by %d)\n", count, count - drop_count);
+
 		release();
 	}
 	else {
