@@ -120,11 +120,11 @@ static void handler(long t) {
 
 	int i;
 	for(i = 0; i < MEASUREMENTS; i++) {
+		rt_sleep(nano2count(PERIOD * NANOSECONDS_PER_MILLISECOND));
+
 		int count = measure_position();
 		counter[i] = mod(count - previous, TICKS);
 		previous = count;
-
-		rt_sleep(nano2count(PERIOD * NANOSECONDS_PER_MILLISECOND));
 	}
 
 	float tps = average(counter, MEASUREMENTS) / ((float) PERIOD / MILLISECONDS_PER_SECOND);
