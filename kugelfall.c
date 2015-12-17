@@ -23,19 +23,29 @@
 #define GRAVITY 9.81
 #define DEGREES 360.0
 
+#define MILLIMETERS_PER_METER 1000
+#define MILLISECONDS_PER_SECOND 1000.0
+#define NANOSECONDS_PER_MILLISECOND 1000000.0
+#define NANOSECONDS_PER_SECOND 1000000000.0
+
+#define MAX_VOLTS 10.0
+#define MIN_DISTANCE 0.1
+#define MAX_DISTANCE 0.5
+#define DISTANCE_BIAS 0.019
+
 static int mod(int a, int b) {
 	return ((a % b) + b) % b;
 }
 
 static void release(void) {
 	digital_ausgabe(0, 0xff);
-	rt_sleep(nano2count(25 * 1000000));
+	rt_sleep(nano2count(25 * NANOSECONDS_PER_MILLISECOND));
 	digital_ausgabe(0, 0x00);
 }
 
 static float measure_distance(void) {
 	float volts = analog_eingabe(7);
-	float distance = volts / 10.0 * 0.4 + 0.1 - 0.019;
+	float distance = volts / MAX_VOLTS * (MAX_DISTANCE - MIN_DISTANCE) + MIN_DISTANCE - DISTANCE_BIAS;
 
 	return distance;
 }
@@ -64,12 +74,14 @@ static float fall_time(float height) {
 
 // determine whether the ball can make it through a hole when falling from the given height in meters and spinning at the given ticks per second
 static int possible(float holeSize, float height, int tps) {
-	int max = holeSize / DEGREES / (BALL + DISK) * 1000 * GRAVITY * fall_time(height) * TICKS;
+	int max = holeSize / DEGREES / (BALL + DISK) * MILLIMETERS_PER_METER * GRAVITY * fall_time(height) * TICKS;
 	return tps < max;
 }
 
+#define MEASUREMENTS 10
+
 static void debug(long t) {
-	float counter[10] = { 0.0 };
+	float counter[MEASUREMENTS] = { 0.0 };
 	int index = 0;
 
 	int previous = measure_position();
@@ -79,42 +91,43 @@ static void debug(long t) {
 		counter[index] = mod(count - previous, TICKS);
 		previous = count;
 		
-		index = mod(index + 1, 10);
+		index = mod(index + 1, MEASUREMENTS);
 
-		float value = average(counter, 10);
-		value = value / ((float) PERIOD / 1000.0);
+		float value = average(counter, MEASUREMENTS);
+		value = value / ((float) PERIOD / MILLISECONDS_PER_SECOND);
 
 		float distance = measure_distance();
 
-		rt_printk("%d millimeters\n", (int) (distance * 1000));
+		rt_printk("%d millimeters\n", (int) (distance * MILLIMETERS_PER_METER));
 		rt_printk("%d tps\n", (int) (value));
 		rt_printk("%d ticks\n", count);
 		rt_printk("possible: small %d, large %d\n", possible(SMALL, distance, (int) value), possible(LARGE, distance, (int) value));
 
 		//release();
 
-		rt_sleep(nano2count(PERIOD * 1000000));
+		rt_sleep(nano2count(PERIOD * NANOSECONDS_PER_MILLISECOND));
 	}
 }
 
 static void handler(long t) {
 	float height = measure_distance();
 
-	rt_printk("Height is %d mm\n", (int) (height * 1000));
+	rt_printk("\n");
+	rt_printk("Height is %d mm\n", (int) (height * MILLIMETERS_PER_METER));
 
-	float counter[10] = { 0.0 };
+	float counter[MEASUREMENTS] = { 0.0 };
 	int previous = measure_position();
 
 	int i;
-	for(i = 0; i < 10; i++) {
+	for(i = 0; i < MEASUREMENTS; i++) {
 		int count = measure_position();
 		counter[i] = mod(count - previous, TICKS);
 		previous = count;
 
-		rt_sleep(nano2count(PERIOD * 1000000));
+		rt_sleep(nano2count(PERIOD * NANOSECONDS_PER_MILLISECOND));
 	}
 
-	float tps = average(counter, 10) / ((float) PERIOD / 1000.0);
+	float tps = average(counter, MEASUREMENTS) / ((float) PERIOD / MILLISECONDS_PER_SECOND);
 
 	rt_printk("Turn speed is %d tps\n", (int) tps);
 
@@ -131,7 +144,7 @@ static void handler(long t) {
 
 		rt_printk("Waiting %d ticks\n", wait_ticks);
 		
-		long long wait_time = (long long) ((float) wait_ticks / tps * 1000000000.0) - 25000000.0;
+		long long wait_time = (long long) ((float) wait_ticks / tps * NANOSECONDS_PER_SECOND);
 
 		rt_printk("Waiting %lld nanoseconds\n", wait_time);
 
